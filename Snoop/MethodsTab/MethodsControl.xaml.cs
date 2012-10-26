@@ -20,6 +20,7 @@ using System.Reflection;
 using System.Linq;
 
 using Snoop.Converters;
+using System.IO;
 
 namespace Snoop.MethodsTab
 {
@@ -185,12 +186,57 @@ namespace Snoop.MethodsTab
             if (selectedMethod == null)
                 return;
 
+            SetInvokeVisibilities();
+
             object[] parameters = new object[this.itemsControlParameters.Items.Count];
 
             if (!TryToCreateParameters(parameters))
                 return;
 
             TryToInvokeMethod(selectedMethod, parameters);
+        }
+
+        private void SetDecompileVisibilities()
+        {
+            this.resultProperties.Visibility = System.Windows.Visibility.Collapsed;
+            this.resultStringContainer.Visibility = System.Windows.Visibility.Collapsed;
+            this.textBlockSourceCode.Visibility = System.Windows.Visibility.Visible;
+        }
+
+        private void SetInvokeVisibilities()
+        {
+            //this.resultProperties.Visibility = System.Windows.Visibility.Collapsed;
+            //this.resultStringContainer.Visibility = System.Windows.Visibility.Collapsed;
+            this.textBlockSourceCode.Visibility = System.Windows.Visibility.Collapsed;
+        }
+
+        public void DecompileMethodClick(object sender, RoutedEventArgs e)
+        {
+            var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
+            if (selectedMethod == null)
+                return;
+
+            SetDecompileVisibilities();
+
+            var source = DecompileMethod(selectedMethod.MethodInfo);
+            this.textBlockSourceCode.Text = source;
+        }
+
+        public static string DecompileMethod(MethodInfo methodToDecompile)
+        {
+            var location = typeof(Snoop.SnoopUI).Assembly.Location;
+            var directory = Path.GetDirectoryName(location);
+            directory = Path.Combine(directory, "ILSpy");
+
+            //var assembly = Assembly.LoadFrom(@"C:\test stuff\decompile\ConsoleApplicationDecompile.exe");
+            var assembly = Assembly.LoadFrom(Path.Combine(directory, "ConsoleApplicationDecompile.exe"));
+            var type = assembly.GetType("ConsoleApplicationDecompile.Program");
+            var method = type.GetMethod("GetSourceOfMethod");
+
+            var result = method.Invoke(null, new object[] { methodToDecompile });
+
+            return result.ToString();
+
         }
 
         private bool TryToCreateParameters(object[] parameters)

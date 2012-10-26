@@ -215,15 +215,22 @@ All other rights reserved.
 			/>
 		</StackPanel>
 
-		<Button
+        <StackPanel Orientation="Horizontal" Grid.Row="4" Height="25">
+            <Button
 			Grid.Row="4"
-			Width="200"
+			Width="150"
 			Height="25"
 			HorizontalAlignment="Left"
 			Click="InvokeMethodClick"
 		>
-			<TextBlock Style="{x:Null}" Text="Invoke"/>
-		</Button>
+                <TextBlock Style="{x:Null}" Text="Invoke"/>
+            </Button>
+
+            <Button Width="150" Height="25"  Margin="15,0,0,0" Click="DecompileMethodClick">
+                <TextBlock Style="{x:Null}" Text="Decompile" />
+            </Button>
+        </StackPanel>
+
 
 		<StackPanel
 			x:Name="resultStringContainer"
@@ -267,5 +274,7 @@ All other rights reserved.
 			/>
 			<snoopNS:PropertyInspector x:Name="propertyInspector" Grid.Row="1"/>
 		</Grid>
+        
+        <TextBox Visibility="Collapsed" Name="textBlockSourceCode" AcceptsReturn="True" Margin="0,20,0,0" Grid.Row="6" />
 	</Grid>
 </UserControl>
