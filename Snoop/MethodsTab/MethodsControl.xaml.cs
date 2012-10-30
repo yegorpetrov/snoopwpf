@@ -21,6 +21,7 @@ using System.Linq;
 
 using Snoop.Converters;
 using System.IO;
+using System.Text;
 
 namespace Snoop.MethodsTab
 {
@@ -159,7 +160,7 @@ namespace Snoop.MethodsTab
         {
             var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
             if (selectedMethod == null || this.Target == null)
-                return;            
+                return;
 
             var parameters = selectedMethod.GetParameters(this.Target.GetType());
             this.itemsControlParameters.ItemsSource = parameters;
@@ -224,19 +225,87 @@ namespace Snoop.MethodsTab
 
         public static string DecompileMethod(MethodInfo methodToDecompile)
         {
+            if (Environment.Version.Major < 4)
+            {
+                var sourceCode = DecompileMethodUsingExternalProcess(methodToDecompile);
+                return sourceCode;
+            }
+            else
+            {
+                var sourceCode = DecompileMethodByLoadingAssembly(methodToDecompile);
+                return sourceCode;
+            }
+
+        }
+
+        private static MethodInfo _decompileMethodInfo = null;
+        private static string DecompileMethodByLoadingAssembly(MethodInfo methodToDecompile)
+        {
+            if (_decompileMethodInfo == null)
+            {
+                var location = typeof(Snoop.SnoopUI).Assembly.Location;
+                var directory = Path.GetDirectoryName(location);
+                directory = Path.Combine(directory, "ILSpy");
+
+                var assembly = Assembly.LoadFrom(Path.Combine(directory, "ConsoleApplicationDecompile.exe"));
+                var type = assembly.GetType("ConsoleApplicationDecompile.Program");
+                _decompileMethodInfo = type.GetMethod("GetSourceOfMethod");
+            }
+
+            try
+            {
+                var result = _decompileMethodInfo.Invoke(null, new object[] { methodToDecompile });
+
+                return result.ToString();
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        private static string GetParametersString(MethodInfo methodInfo)
+        {
+            var parameters = methodInfo.GetParameters();
+
+            if (parameters.Length == 0)
+                return string.Empty;
+
+            string[] parametersStringArray = new string[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+                parametersStringArray[i] = parameters[i].Name;
+
+            var parametersString = string.Join("|", parametersStringArray);
+            return parametersString;
+        }
+
+        private static string DecompileMethodUsingExternalProcess(MethodInfo methodToDecompile)
+        {
             var location = typeof(Snoop.SnoopUI).Assembly.Location;
             var directory = Path.GetDirectoryName(location);
             directory = Path.Combine(directory, "ILSpy");
+            var decompileProgramName = Path.Combine(directory, "ConsoleApplicationDecompile.exe");
 
-            //var assembly = Assembly.LoadFrom(@"C:\test stuff\decompile\ConsoleApplicationDecompile.exe");
-            var assembly = Assembly.LoadFrom(Path.Combine(directory, "ConsoleApplicationDecompile.exe"));
-            var type = assembly.GetType("ConsoleApplicationDecompile.Program");
-            var method = type.GetMethod("GetSourceOfMethod");
+            Process decompileProcess;
+            decompileProcess = new Process();
+            decompileProcess.StartInfo.FileName = decompileProgramName;// "ConsoleApplicationDecompile.exe";//decompileProgramName;
+            decompileProcess.StartInfo.WorkingDirectory = directory;
+            //// Set UseShellExecute to false for redirection.
+            var parametersStringArray = GetParametersString(methodToDecompile);
+            decompileProcess.StartInfo.Arguments = methodToDecompile.DeclaringType.Assembly.Location + " " + methodToDecompile.DeclaringType.Name + " " + methodToDecompile.Name + " " + parametersStringArray;
 
-            var result = method.Invoke(null, new object[] { methodToDecompile });
+            decompileProcess.StartInfo.UseShellExecute = false;
 
-            return result.ToString();
+            //// Redirect the standard output of the sort command.   
+            decompileProcess.StartInfo.RedirectStandardOutput = true;
+            StringBuilder sourceCode = new StringBuilder();
+            decompileProcess.Start();
+            sourceCode.Append(decompileProcess.StandardOutput.ReadToEnd());
+            //decompileProcess.BeginOutputReadLine();
+            decompileProcess.WaitForExit();
 
+            //return string.Empty;
+            return sourceCode.ToString();
         }
 
         private bool TryToCreateParameters(object[] parameters)
@@ -287,7 +356,7 @@ namespace Snoop.MethodsTab
                 }
                 else
                 {
-                    this.resultStringContainer.Visibility = this.textBlockResult.Visibility = this.textBlockResultLabel.Visibility = System.Windows.Visibility.Visible;                    
+                    this.resultStringContainer.Visibility = this.textBlockResult.Visibility = this.textBlockResultLabel.Visibility = System.Windows.Visibility.Visible;
                 }
 
                 this.textBlockResultLabel.Text = "Result as string: ";
@@ -346,10 +415,10 @@ namespace Snoop.MethodsTab
 
                 var info = new SnoopMethodInformation(method);
                 info.MethodName = method.Name;
-                
+
                 methodsToReturn.Add(info);
             }
-            methodsToReturn.Sort();            
+            methodsToReturn.Sort();
 
             return methodsToReturn;
         }
@@ -373,5 +442,5 @@ namespace Snoop.MethodsTab
         }
 
     }
-       
+
 }
