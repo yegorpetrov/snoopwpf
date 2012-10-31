@@ -217,17 +217,19 @@ All other rights reserved.
 
         <StackPanel Orientation="Horizontal" Grid.Row="4" Height="25">
             <Button
-			Grid.Row="4"
-			Width="150"
+			Width="100"
 			Height="25"
 			HorizontalAlignment="Left"
-			Click="InvokeMethodClick"
-		>
+			Click="InvokeMethodClick">
                 <TextBlock Style="{x:Null}" Text="Invoke"/>
             </Button>
 
-            <Button Width="150" Height="25"  Margin="15,0,0,0" Click="DecompileMethodClick">
+            <Button Width="100" Height="25"  Margin="15,0,0,0" Click="DecompileMethodClick">
                 <TextBlock Style="{x:Null}" Text="Decompile" />
+            </Button>
+
+            <Button Name="buttonOpenFolder" Width="100" Height="25"  Margin="15,0,0,0" Click="OpenFolderClick">
+                <TextBlock Style="{x:Null}" Text="Open Folder" />
             </Button>
         </StackPanel>
 
@@ -274,7 +276,7 @@ All other rights reserved.
 			/>
 			<snoopNS:PropertyInspector x:Name="propertyInspector" Grid.Row="1"/>
 		</Grid>
-        
-        <TextBox Visibility="Collapsed" Name="textBlockSourceCode" AcceptsReturn="True" Margin="0,20,0,0" Grid.Row="6" />
+
+        <TextBox Visibility="Collapsed" Name="textBlockSourceCode" AcceptsReturn="True" ScrollViewer.VerticalScrollBarVisibility="Auto" Margin="0,20,0,0" Grid.Row="6" />
 	</Grid>
 </UserControl>

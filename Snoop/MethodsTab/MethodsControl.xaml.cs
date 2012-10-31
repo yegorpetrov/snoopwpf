@@ -211,6 +211,18 @@ namespace Snoop.MethodsTab
             this.textBlockSourceCode.Visibility = System.Windows.Visibility.Collapsed;
         }
 
+        private void OpenFolderClick(object sender, RoutedEventArgs e)
+        {
+            var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
+            if (selectedMethod == null)
+                return;
+
+            var filePath = selectedMethod.MethodInfo.DeclaringType.Assembly.Location;
+            var argument = @"/select, " + filePath;
+
+            System.Diagnostics.Process.Start("explorer.exe", argument);
+        }
+
         public void DecompileMethodClick(object sender, RoutedEventArgs e)
         {
             var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
@@ -273,7 +285,7 @@ namespace Snoop.MethodsTab
 
             string[] parametersStringArray = new string[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
-                parametersStringArray[i] = parameters[i].Name;
+                parametersStringArray[i] = parameters[i].ParameterType.Name;
 
             var parametersString = string.Join("|", parametersStringArray);
             return parametersString;
@@ -292,7 +304,12 @@ namespace Snoop.MethodsTab
             decompileProcess.StartInfo.WorkingDirectory = directory;
             //// Set UseShellExecute to false for redirection.
             var parametersStringArray = GetParametersString(methodToDecompile);
-            decompileProcess.StartInfo.Arguments = methodToDecompile.DeclaringType.Assembly.Location + " " + methodToDecompile.DeclaringType.Name + " " + methodToDecompile.Name + " " + parametersStringArray;
+            //decompileProcess.StartInfo.Arguments = "\"" + methodToDecompile.DeclaringType.Assembly.Location + "\"" + " " + methodToDecompile.DeclaringType.Name + " " + methodToDecompile.Name + " " + parametersStringArray;
+            decompileProcess.StartInfo.Arguments = string.Format("\"{0}\" {1} {2} {3}", methodToDecompile.DeclaringType.Assembly.Location,
+                methodToDecompile.DeclaringType.Name, 
+                methodToDecompile.Name, 
+                parametersStringArray);
+
 
             decompileProcess.StartInfo.UseShellExecute = false;
 
@@ -301,10 +318,8 @@ namespace Snoop.MethodsTab
             StringBuilder sourceCode = new StringBuilder();
             decompileProcess.Start();
             sourceCode.Append(decompileProcess.StandardOutput.ReadToEnd());
-            //decompileProcess.BeginOutputReadLine();
             decompileProcess.WaitForExit();
 
-            //return string.Empty;
             return sourceCode.ToString();
         }
 
@@ -440,6 +455,8 @@ namespace Snoop.MethodsTab
                 this.Target = paramCreator.SelectedTarget;
             }
         }
+
+
 
     }
 
