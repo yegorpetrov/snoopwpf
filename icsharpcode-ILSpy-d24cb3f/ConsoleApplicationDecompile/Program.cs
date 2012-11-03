@@ -99,7 +99,10 @@ namespace ConsoleApplicationDecompile
             var options = new DecompilationOptions();
             language.DecompileMethod(methodDefinition, textOutput, options);
 
-            var source = textOutput.GetSource();
+            textOutput.PrepareDocument();
+
+            var source = textOutput.GetDocument().Text;
+            //var source = textOutput.GetSource();
 
             return source;
         }

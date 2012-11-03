@@ -67,14 +67,6 @@ namespace ICSharpCode.ILSpy.TextView
 	/// </summary>
 	public sealed class AvalonEditTextOutput : ISmartTextOutput
 	{
-        /// <summary>
-        /// For Snoop.
-        /// </summary>
-        /// <returns></returns>
-        public string GetSource()
-        {
-            return b.ToString();
-        }
 
 		int lastLineStart = 0;
 		int lineNumber = 1;
