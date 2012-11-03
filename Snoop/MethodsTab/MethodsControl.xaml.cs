@@ -38,6 +38,19 @@ namespace Snoop.MethodsTab
 
             this._checkBoxUseDataContext.Checked += _checkBoxUseDataContext_Checked;
             this._checkBoxUseDataContext.Unchecked += new RoutedEventHandler(_checkBoxUseDataContext_Unchecked);
+
+            this._checkBoxShowPrivateMethods.Checked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Checked);
+            this._checkBoxShowPrivateMethods.Unchecked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Unchecked);
+        }
+
+        void _checkBoxShowPrivateMethods_Unchecked(object sender, RoutedEventArgs e)
+        {
+            PopulateMethodsCombobox(this);
+        }
+
+        void _checkBoxShowPrivateMethods_Checked(object sender, RoutedEventArgs e)
+        {
+            PopulateMethodsCombobox(this);
         }
 
         void _checkBoxUseDataContext_Unchecked(object sender, RoutedEventArgs e)
@@ -120,22 +133,38 @@ namespace Snoop.MethodsTab
 
                 methodsControl.EnableOrDisableDataContextCheckbox();
 
-                var methodInfos = GetMethodInfos(methodsControl.Target);
-                methodsControl.comboBoxMethods.ItemsSource = methodInfos;
+                PopulateMethodsCombobox(methodsControl);
+            }
+        }
 
-                methodsControl.resultProperties.Visibility = Visibility.Collapsed;
-                methodsControl.resultStringContainer.Visibility = Visibility.Collapsed;
-                methodsControl.parametersContainer.Visibility = Visibility.Collapsed;
+        private static void PopulateMethodsCombobox(MethodsControl methodsControl)
+        {
+            var methodInfos = GetMethodInfos(methodsControl.Target, methodsControl._checkBoxShowPrivateMethods.IsChecked.HasValue && methodsControl._checkBoxShowPrivateMethods.IsChecked.Value);
+            methodsControl.comboBoxMethods.ItemsSource = methodInfos;
 
-                //if this target has the previous method info, set it
-                for (int i = 0; i < methodInfos.Count && methodsControl._previousMethodInformation != null; i++)
+            methodsControl.resultProperties.Visibility = Visibility.Collapsed;
+            methodsControl.resultStringContainer.Visibility = Visibility.Collapsed;
+            methodsControl.parametersContainer.Visibility = Visibility.Collapsed;
+
+            //SetPreviousSelectedMethod(methodsControl);
+            methodsControl.SetPreviousSelectedMethod();
+        }
+
+        private void SetPreviousSelectedMethod()
+        {
+
+            var currentMethodInfos =
+                this.comboBoxMethods.ItemsSource as IList<SnoopMethodInformation>;
+            if (currentMethodInfos == null)
+                return;
+
+            for (int i = 0; i < currentMethodInfos.Count && this._previousMethodInformation != null; i++)
+            {
+                var methodInfo = currentMethodInfos[i];
+                if (methodInfo.Equals(this._previousMethodInformation))
                 {
-                    var methodInfo = methodInfos[i];
-                    if (methodInfo.Equals(methodsControl._previousMethodInformation))
-                    {
-                        methodsControl.comboBoxMethods.SelectedIndex = i;
-                        break;
-                    }
+                    this.comboBoxMethods.SelectedIndex = i;
+                    break;
                 }
             }
         }
@@ -306,8 +335,8 @@ namespace Snoop.MethodsTab
             var parametersStringArray = GetParametersString(methodToDecompile);
             //decompileProcess.StartInfo.Arguments = "\"" + methodToDecompile.DeclaringType.Assembly.Location + "\"" + " " + methodToDecompile.DeclaringType.Name + " " + methodToDecompile.Name + " " + parametersStringArray;
             decompileProcess.StartInfo.Arguments = string.Format("\"{0}\" {1} {2} {3}", methodToDecompile.DeclaringType.Assembly.Location,
-                methodToDecompile.DeclaringType.Name, 
-                methodToDecompile.Name, 
+                methodToDecompile.DeclaringType.Name,
+                methodToDecompile.Name,
                 parametersStringArray);
 
 
@@ -413,13 +442,16 @@ namespace Snoop.MethodsTab
             }
         }
 
-        private static IList<SnoopMethodInformation> GetMethodInfos(object o)
+        private static IList<SnoopMethodInformation> GetMethodInfos(object o, bool getPrivateMethods)
         {
             if (o == null)
                 return new ObservableCollection<SnoopMethodInformation>();
-
             Type t = o.GetType();
-            var methods = t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.InvokeMethod);
+            var bindingFlags = getPrivateMethods
+                                   ? BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.InvokeMethod
+                                   : BindingFlags.Instance | BindingFlags.Public | BindingFlags.InvokeMethod;
+
+            var methods = t.GetMethods(bindingFlags);
 
             var methodsToReturn = new List<SnoopMethodInformation>();
 
