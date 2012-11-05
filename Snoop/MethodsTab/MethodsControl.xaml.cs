@@ -158,6 +158,8 @@ namespace Snoop.MethodsTab
             if (currentMethodInfos == null)
                 return;
 
+            this.comboBoxMethods.SelectedIndex = -1;
+
             for (int i = 0; i < currentMethodInfos.Count && this._previousMethodInformation != null; i++)
             {
                 var methodInfo = currentMethodInfos[i];
