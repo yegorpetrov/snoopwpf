@@ -20,6 +20,8 @@ using System.Reflection;
 using System.Linq;
 
 using Snoop.Converters;
+using System.IO;
+using System.Text;
 
 namespace Snoop.MethodsTab
 {
@@ -36,6 +38,19 @@ namespace Snoop.MethodsTab
 
             this._checkBoxUseDataContext.Checked += _checkBoxUseDataContext_Checked;
             this._checkBoxUseDataContext.Unchecked += new RoutedEventHandler(_checkBoxUseDataContext_Unchecked);
+
+            this._checkBoxShowPrivateMethods.Checked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Checked);
+            this._checkBoxShowPrivateMethods.Unchecked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Unchecked);
+        }
+
+        void _checkBoxShowPrivateMethods_Unchecked(object sender, RoutedEventArgs e)
+        {
+            PopulateMethodsCombobox(this);
+        }
+
+        void _checkBoxShowPrivateMethods_Checked(object sender, RoutedEventArgs e)
+        {
+            PopulateMethodsCombobox(this);
         }
 
         void _checkBoxUseDataContext_Unchecked(object sender, RoutedEventArgs e)
@@ -118,22 +133,38 @@ namespace Snoop.MethodsTab
 
                 methodsControl.EnableOrDisableDataContextCheckbox();
 
-                var methodInfos = GetMethodInfos(methodsControl.Target);
-                methodsControl.comboBoxMethods.ItemsSource = methodInfos;
+                PopulateMethodsCombobox(methodsControl);
+            }
+        }
 
-                methodsControl.resultProperties.Visibility = Visibility.Collapsed;
-                methodsControl.resultStringContainer.Visibility = Visibility.Collapsed;
-                methodsControl.parametersContainer.Visibility = Visibility.Collapsed;
+        private static void PopulateMethodsCombobox(MethodsControl methodsControl)
+        {
+            var methodInfos = GetMethodInfos(methodsControl.Target, methodsControl._checkBoxShowPrivateMethods.IsChecked.HasValue && methodsControl._checkBoxShowPrivateMethods.IsChecked.Value);
+            methodsControl.comboBoxMethods.ItemsSource = methodInfos;
 
-                //if this target has the previous method info, set it
-                for (int i = 0; i < methodInfos.Count && methodsControl._previousMethodInformation != null; i++)
+            methodsControl.resultProperties.Visibility = Visibility.Collapsed;
+            methodsControl.resultStringContainer.Visibility = Visibility.Collapsed;
+            methodsControl.parametersContainer.Visibility = Visibility.Collapsed;
+
+            //SetPreviousSelectedMethod(methodsControl);
+            methodsControl.SetPreviousSelectedMethod();
+        }
+
+        private void SetPreviousSelectedMethod()
+        {
+
+            var currentMethodInfos =
+                this.comboBoxMethods.ItemsSource as IList<SnoopMethodInformation>;
+            if (currentMethodInfos == null)
+                return;
+
+            for (int i = 0; i < currentMethodInfos.Count && this._previousMethodInformation != null; i++)
+            {
+                var methodInfo = currentMethodInfos[i];
+                if (methodInfo.Equals(this._previousMethodInformation))
                 {
-                    var methodInfo = methodInfos[i];
-                    if (methodInfo.Equals(methodsControl._previousMethodInformation))
-                    {
-                        methodsControl.comboBoxMethods.SelectedIndex = i;
-                        break;
-                    }
+                    this.comboBoxMethods.SelectedIndex = i;
+                    break;
                 }
             }
         }
@@ -158,7 +189,7 @@ namespace Snoop.MethodsTab
         {
             var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
             if (selectedMethod == null || this.Target == null)
-                return;            
+                return;
 
             var parameters = selectedMethod.GetParameters(this.Target.GetType());
             this.itemsControlParameters.ItemsSource = parameters;
@@ -185,12 +216,140 @@ namespace Snoop.MethodsTab
             if (selectedMethod == null)
                 return;
 
+            SetInvokeVisibilities();
+
             object[] parameters = new object[this.itemsControlParameters.Items.Count];
 
             if (!TryToCreateParameters(parameters))
                 return;
 
             TryToInvokeMethod(selectedMethod, parameters);
+        }
+
+        private void SetDecompileVisibilities()
+        {
+            this.resultProperties.Visibility = System.Windows.Visibility.Collapsed;
+            this.resultStringContainer.Visibility = System.Windows.Visibility.Collapsed;
+            this.textBlockSourceCode.Visibility = System.Windows.Visibility.Visible;
+        }
+
+        private void SetInvokeVisibilities()
+        {
+            //this.resultProperties.Visibility = System.Windows.Visibility.Collapsed;
+            //this.resultStringContainer.Visibility = System.Windows.Visibility.Collapsed;
+            this.textBlockSourceCode.Visibility = System.Windows.Visibility.Collapsed;
+        }
+
+        private void OpenFolderClick(object sender, RoutedEventArgs e)
+        {
+            var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
+            if (selectedMethod == null)
+                return;
+
+            var filePath = selectedMethod.MethodInfo.DeclaringType.Assembly.Location;
+            var argument = @"/select, " + filePath;
+
+            System.Diagnostics.Process.Start("explorer.exe", argument);
+        }
+
+        public void DecompileMethodClick(object sender, RoutedEventArgs e)
+        {
+            var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
+            if (selectedMethod == null)
+                return;
+
+            SetDecompileVisibilities();
+
+            var source = DecompileMethod(selectedMethod.MethodInfo);
+            this.textBlockSourceCode.Text = source;
+        }
+
+        public static string DecompileMethod(MethodInfo methodToDecompile)
+        {
+            if (Environment.Version.Major < 4)
+            {
+                var sourceCode = DecompileMethodUsingExternalProcess(methodToDecompile);
+                return sourceCode;
+            }
+            else
+            {
+                var sourceCode = DecompileMethodByLoadingAssembly(methodToDecompile);
+                return sourceCode;
+            }
+
+        }
+
+        private static MethodInfo _decompileMethodInfo = null;
+        private static string DecompileMethodByLoadingAssembly(MethodInfo methodToDecompile)
+        {
+            if (_decompileMethodInfo == null)
+            {
+                var location = typeof(Snoop.SnoopUI).Assembly.Location;
+                var directory = Path.GetDirectoryName(location);
+                directory = Path.Combine(directory, "ILSpy");
+
+                var assembly = Assembly.LoadFrom(Path.Combine(directory, "ConsoleApplicationDecompile.exe"));
+                var type = assembly.GetType("ConsoleApplicationDecompile.Program");
+                _decompileMethodInfo = type.GetMethod("GetSourceOfMethod");
+            }
+
+            try
+            {
+                var result = _decompileMethodInfo.Invoke(null, new object[] { methodToDecompile });
+
+                return result.ToString();
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        private static string GetParametersString(MethodInfo methodInfo)
+        {
+            var parameters = methodInfo.GetParameters();
+
+            if (parameters.Length == 0)
+                return string.Empty;
+
+            string[] parametersStringArray = new string[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+                parametersStringArray[i] = parameters[i].ParameterType.Name;
+
+            var parametersString = string.Join("|", parametersStringArray);
+            return parametersString;
+        }
+
+        private static string DecompileMethodUsingExternalProcess(MethodInfo methodToDecompile)
+        {
+            var location = typeof(Snoop.SnoopUI).Assembly.Location;
+            var directory = Path.GetDirectoryName(location);
+            directory = Path.Combine(directory, "ILSpy");
+            var decompileProgramName = Path.Combine(directory, "ConsoleApplicationDecompile.exe");
+
+            Process decompileProcess;
+            decompileProcess = new Process();
+            decompileProcess.StartInfo.FileName = decompileProgramName;// "ConsoleApplicationDecompile.exe";//decompileProgramName;
+            decompileProcess.StartInfo.WorkingDirectory = directory;
+            //// Set UseShellExecute to false for redirection.
+            var parametersStringArray = GetParametersString(methodToDecompile);
+            //decompileProcess.StartInfo.Arguments = "\"" + methodToDecompile.DeclaringType.Assembly.Location + "\"" + " " + methodToDecompile.DeclaringType.Name + " " + methodToDecompile.Name + " " + parametersStringArray;
+            decompileProcess.StartInfo.Arguments = string.Format("\"{0}\" {1} {2} {3}", methodToDecompile.DeclaringType.Assembly.Location,
+                methodToDecompile.DeclaringType.Name,
+                methodToDecompile.Name,
+                parametersStringArray);
+
+
+            decompileProcess.StartInfo.UseShellExecute = false;
+
+            //// Redirect the standard output of the sort command.   
+            decompileProcess.StartInfo.RedirectStandardOutput = true;
+            StringBuilder sourceCode = new StringBuilder();
+            decompileProcess.Start();
+            sourceCode.Append(decompileProcess.StandardOutput.ReadToEnd());
+            decompileProcess.WaitForExit();
+
+            return sourceCode.ToString();
         }
 
         private bool TryToCreateParameters(object[] parameters)
@@ -241,7 +400,7 @@ namespace Snoop.MethodsTab
                 }
                 else
                 {
-                    this.resultStringContainer.Visibility = this.textBlockResult.Visibility = this.textBlockResultLabel.Visibility = System.Windows.Visibility.Visible;                    
+                    this.resultStringContainer.Visibility = this.textBlockResult.Visibility = this.textBlockResultLabel.Visibility = System.Windows.Visibility.Visible;
                 }
 
                 this.textBlockResultLabel.Text = "Result as string: ";
@@ -283,13 +442,16 @@ namespace Snoop.MethodsTab
             }
         }
 
-        private static IList<SnoopMethodInformation> GetMethodInfos(object o)
+        private static IList<SnoopMethodInformation> GetMethodInfos(object o, bool getPrivateMethods)
         {
             if (o == null)
                 return new ObservableCollection<SnoopMethodInformation>();
-
             Type t = o.GetType();
-            var methods = t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.InvokeMethod);
+            var bindingFlags = getPrivateMethods
+                                   ? BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.InvokeMethod
+                                   : BindingFlags.Instance | BindingFlags.Public | BindingFlags.InvokeMethod;
+
+            var methods = t.GetMethods(bindingFlags);
 
             var methodsToReturn = new List<SnoopMethodInformation>();
 
@@ -300,10 +462,10 @@ namespace Snoop.MethodsTab
 
                 var info = new SnoopMethodInformation(method);
                 info.MethodName = method.Name;
-                
+
                 methodsToReturn.Add(info);
             }
-            methodsToReturn.Sort();            
+            methodsToReturn.Sort();
 
             return methodsToReturn;
         }
@@ -326,6 +488,8 @@ namespace Snoop.MethodsTab
             }
         }
 
+
+
     }
-       
+
 }
