@@ -14,7 +14,7 @@ All other rights reserved.
 	xmlns:snoopNS="clr-namespace:Snoop"
 	xmlns:converters="clr-namespace:Snoop.Converters"
 	mc:Ignorable="d"
-	d:DesignWidth="420"
+	d:DesignWidth="500"
 	d:DesignHeight="300"
 >
     <UserControl.Resources>
@@ -200,7 +200,7 @@ All other rights reserved.
 				FontWeight="Bold"
 				Text="Method:"
 			/>
-            <ComboBox x:Name="comboBoxMethods" Width="350" Height="25"/>
+            <ComboBox x:Name="comboBoxMethods" Width="411" Height="25"/>
         </StackPanel>
 
         <StackPanel
@@ -225,19 +225,29 @@ All other rights reserved.
 
         <StackPanel Orientation="Horizontal" Grid.Row="4" Height="25">
             <Button
-			Width="100"
+                Name="_buttonInvoke"
+			Width="75"
 			Height="25"
-			HorizontalAlignment="Left"
-			Click="InvokeMethodClick">
+			HorizontalAlignment="Left">
                 <TextBlock Style="{x:Null}" Text="Invoke"/>
             </Button>
 
-            <Button Width="100" Height="25"  Margin="15,0,0,0" Click="DecompileMethodClick">
+            <Button Name="_buttonDecompile" Width="75" Height="25"  Margin="15,0,0,0">
                 <TextBlock Style="{x:Null}" Text="Decompile" />
             </Button>
 
-            <Button Name="buttonOpenFolder" Width="100" Height="25"  Margin="15,0,0,0" Click="OpenFolderClick">
-                <TextBlock Style="{x:Null}" Text="Open Folder" />
+            <!--<Button Name="_buttonOpenFolder" Width="75" Height="25"  Margin="15,0,0,0" IsEnabled="False">
+                <TextBlock Style="{x:Null}" Text="Open ILSpy" />
+            </Button>-->
+
+            <Button Name="_buttonNavigateILSpy" Width="135" Height="25"  Margin="15,0,0,0">
+                <TextBlock Style="{x:Null}" FontSize="10" Text="Open Method Class in ILSpy" />
+                <!--<TextBox Background="Transparent" BorderThickness="0" Width="74" AcceptsReturn="True" TextWrapping="WrapWithOverflow" Text="ILSpy Method" FontSize="10" Height="18" />-->
+            </Button>
+
+            <Button Name="_buttonObjectNavigateILSpy" Width="135" Height="25"  Margin="15,0,0,0" IsEnabled="{Binding Path=IsEnabled, ElementName=buttonNavigateILSpy}">
+                <!--<TextBlock Style="{x:Null}" Text="Object Type" />-->
+                <TextBlock Style="{x:Null}" FontSize="10" Text="Open Target Class in ILSpy" />
             </Button>
         </StackPanel>
 

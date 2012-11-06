@@ -10,6 +10,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -41,6 +42,12 @@ namespace Snoop.MethodsTab
 
             this._checkBoxShowPrivateMethods.Checked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Checked);
             this._checkBoxShowPrivateMethods.Unchecked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Unchecked);
+
+            this._buttonDecompile.Click += DecompileMethodClick;
+            //this._buttonOpenFolder.Click += OpenFolderClick;
+            this._buttonNavigateILSpy.Click += NavigateILSpyClick;
+            this._buttonObjectNavigateILSpy.Click += buttonObjectNavigateILSpy_Click;
+            this._buttonInvoke.Click += InvokeMethodClick;
         }
 
         void _checkBoxShowPrivateMethods_Unchecked(object sender, RoutedEventArgs e)
@@ -237,21 +244,101 @@ namespace Snoop.MethodsTab
 
         private void SetInvokeVisibilities()
         {
-            //this.resultProperties.Visibility = System.Windows.Visibility.Collapsed;
-            //this.resultStringContainer.Visibility = System.Windows.Visibility.Collapsed;
+
             this.textBlockSourceCode.Visibility = System.Windows.Visibility.Collapsed;
+        }
+
+        private Process ilSpyProcess;
+
+        private void buttonObjectNavigateILSpy_Click(object sender, RoutedEventArgs e)
+        {
+
+            var type = this.Target.GetType();
+            if (ilSpyProcess == null || ilSpyProcess.HasExited)
+            {
+                ilSpyProcess = ILSpyInterop.GetOrCreateILSpyProcess(type.Assembly.Location, type.FullName);
+            }
+            else
+            {
+                ILSpyInterop.OpenTypeInILSpy(type.Assembly.Location, type.FullName, ilSpyProcess.MainWindowHandle);
+            }
+
+        }
+
+        private void NavigateILSpyClick(object sender, RoutedEventArgs e)
+        {
+            var snoopMethodInfo = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
+            if (snoopMethodInfo == null)
+            {
+                MessageBox.Show("Please select a method.");
+                return;
+            }
+            var selectedItem = snoopMethodInfo.MethodInfo;
+
+            if (ilSpyProcess == null || ilSpyProcess.HasExited)
+            {
+                ilSpyProcess = ILSpyInterop.GetOrCreateILSpyProcess(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
+            }
+            else
+            {
+                ILSpyInterop.OpenTypeInILSpy(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName, ilSpyProcess.MainWindowHandle);
+            }
+            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
+            //NativeMethods.Send(ilSpyProcess.MainWindowHandle, args);   
         }
 
         private void OpenFolderClick(object sender, RoutedEventArgs e)
         {
-            var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
-            if (selectedMethod == null)
+            //var selectedMethod = this.comboBoxMethods.SelectedValue as SnoopMethodInformation;
+            //if (selectedMethod == null)
+            //    return;
+
+            //var filePath = selectedMethod.MethodInfo.DeclaringType.Assembly.Location;
+            //var argument = @"/select, " + filePath;
+
+            //System.Diagnostics.Process.Start("explorer.exe", argument);
+            //ILSPY
+
+            if (ilSpyProcess != null && !ilSpyProcess.HasExited)
                 return;
 
-            var filePath = selectedMethod.MethodInfo.DeclaringType.Assembly.Location;
-            var argument = @"/select, " + filePath;
+            var location = typeof(Snoop.SnoopUI).Assembly.Location;
+            var directory = Path.GetDirectoryName(location);
+            directory = Path.Combine(directory, "ILSpy");
+            var ilSpyProgram = Path.Combine(directory, "ILSpy.exe");
 
-            System.Diagnostics.Process.Start("explorer.exe", argument);
+            var processes = Process.GetProcessesByName("ILSpy");
+            if (processes.Length > 0)
+            {
+                ilSpyProcess = processes[0];
+                ilSpyProcess.EnableRaisingEvents = true;
+                this._buttonNavigateILSpy.IsEnabled = true;
+                ilSpyProcess.Exited += new EventHandler(ilSpyProcess_Exited);
+                return;
+            }
+
+            ilSpyProcess = new Process();
+            ilSpyProcess.StartInfo.FileName = ilSpyProgram;// "ConsoleApplicationDecompile.exe";//decompileProgramName;
+            ilSpyProcess.StartInfo.WorkingDirectory = directory;
+            ilSpyProcess.EnableRaisingEvents = true;
+            ilSpyProcess.Start();
+            //ilSpyProcess.Exited += new EventHandler(ilSpyProcess_Exited);
+            //this._buttonNavigateILSpy.IsEnabled = true;
+
+
+        }
+
+        void ilSpyProcess_Exited(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke((Action)IlSpyProcessExited);
+        }
+
+
+        private void IlSpyProcessExited()
+        {
+            ilSpyProcess = null;
+            //this._buttonNavigateILSpy.IsEnabled = false;
+            //throw new NotImplementedException();
         }
 
         public void DecompileMethodClick(object sender, RoutedEventArgs e)
@@ -489,8 +576,6 @@ namespace Snoop.MethodsTab
                 this.Target = paramCreator.SelectedTarget;
             }
         }
-
-
 
     }
 
