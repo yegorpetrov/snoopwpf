@@ -25,6 +25,7 @@ namespace Snoop
             //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
             string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
             NativeMethods.Send(windowHandle, args);
+            NativeMethods.SetForegroundWindow(ilSpyProcess.MainWindowHandle);
         }
 
         public static void OpenTypeInILSpy(string fullAssemblyPath, string fullTypeName, IntPtr windowHandle)
@@ -32,6 +33,7 @@ namespace Snoop
             //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
             string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
             NativeMethods.Send(windowHandle, args);
+            NativeMethods.SetForegroundWindow(windowHandle);
         }
 
         public static Process GetOrCreateILSpyProcess(string fullAssemblyPath, string fullTypeName)
@@ -46,8 +48,9 @@ namespace Snoop
             if (processes.Length > 0)
             {
                 ilSpyProcess = processes[0];
-                ilSpyProcess.EnableRaisingEvents = true;
+                //ilSpyProcess.EnableRaisingEvents = true;
                 OpenTypeInILSpy(fullAssemblyPath, fullTypeName, ilSpyProcess);
+                NativeMethods.SetForegroundWindow(ilSpyProcess.MainWindowHandle);
                 return ilSpyProcess;
             }
 
@@ -84,6 +87,9 @@ namespace Snoop
         public static extern IntPtr SendMessageTimeout(
             IntPtr hWnd, uint msg, IntPtr wParam, ref CopyDataStruct lParam,
             uint flags, uint timeout, out IntPtr result);
+
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
 
         public const uint WM_COPYDATA = 0x4a;
 
