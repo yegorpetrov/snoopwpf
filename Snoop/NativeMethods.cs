@@ -36,7 +36,33 @@ namespace Snoop
             NativeMethods.SetForegroundWindow(windowHandle);
         }
 
+        public static void OpenMethodInILSpy(string fullAssemblyPath, string fullTypeName, string methodName, IntPtr windowHandle)
+        {
+            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
+            fullTypeName = fullTypeName.Replace('+', '.');
+            string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            NativeMethods.Send(windowHandle, args);
+            NativeMethods.SetForegroundWindow(windowHandle);
+        }
+
         public static Process GetOrCreateILSpyProcess(string fullAssemblyPath, string fullTypeName)
+        {
+            fullTypeName = fullTypeName.Replace('+', '.');
+            string arguments = string.Format("\"{0}\" /navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            string sendToProcessArgs = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            return CreateILSpyProcessWithArguments(fullAssemblyPath, fullTypeName, arguments, sendToProcessArgs);
+        }
+
+        public static Process GetOrCreateILSpyProcess(string fullAssemblyPath, string fullTypeName, string methodName)
+        {
+            fullTypeName = fullTypeName.Replace('+', '.');
+            //string arguments = string.Format("\"{0}\" /navigateTo:M:{1}", fullAssemblyPath, fullTypeName + methodName);
+            string arguments = string.Format("\"{0}\" /navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            string sendToProcessArgs = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            return CreateILSpyProcessWithArguments(fullAssemblyPath, fullTypeName, arguments, sendToProcessArgs);
+        }
+
+        private static Process CreateILSpyProcessWithArguments(string fullAssemblyPath, string fullTypeName, string arguments, string sendToProcessArgs)
         {
             Process ilSpyProcess = null;
             var location = typeof(Snoop.SnoopUI).Assembly.Location;
@@ -49,15 +75,16 @@ namespace Snoop
             {
                 ilSpyProcess = processes[0];
                 //ilSpyProcess.EnableRaisingEvents = true;
-                OpenTypeInILSpy(fullAssemblyPath, fullTypeName, ilSpyProcess);
+                //OpenTypeInILSpy(fullAssemblyPath, fullTypeName, ilSpyProcess);
+                NativeMethods.Send(ilSpyProcess.MainWindowHandle, sendToProcessArgs);
                 NativeMethods.SetForegroundWindow(ilSpyProcess.MainWindowHandle);
                 return ilSpyProcess;
             }
 
             ilSpyProcess = new Process();
-            ilSpyProcess.StartInfo.FileName = ilSpyProgram;// "ConsoleApplicationDecompile.exe";//decompileProgramName;
+            ilSpyProcess.StartInfo.FileName = ilSpyProgram; // "ConsoleApplicationDecompile.exe";//decompileProgramName;
             ilSpyProcess.StartInfo.WorkingDirectory = directory;
-            ilSpyProcess.StartInfo.Arguments = string.Format("\"{0}\" /navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            ilSpyProcess.StartInfo.Arguments = arguments;
             //ilSpyProcess.EnableRaisingEvents = true;
             ilSpyProcess.Start();
             return ilSpyProcess;

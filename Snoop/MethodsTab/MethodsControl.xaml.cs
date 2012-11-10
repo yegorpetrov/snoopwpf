@@ -277,11 +277,13 @@ namespace Snoop.MethodsTab
 
             if (ilSpyProcess == null || ilSpyProcess.HasExited)
             {
-                ilSpyProcess = ILSpyInterop.GetOrCreateILSpyProcess(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
+                //ilSpyProcess = ILSpyInterop.GetOrCreateILSpyProcess(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
+                ilSpyProcess = ILSpyInterop.GetOrCreateILSpyProcess(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName, selectedItem.Name);
             }
             else
             {
-                ILSpyInterop.OpenTypeInILSpy(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName, ilSpyProcess.MainWindowHandle);
+                //ILSpyInterop.OpenTypeInILSpy(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName, ilSpyProcess.MainWindowHandle);
+                ILSpyInterop.OpenMethodInILSpy(selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName, selectedItem.Name, ilSpyProcess.MainWindowHandle);
             }
             //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
             //NativeMethods.Send(ilSpyProcess.MainWindowHandle, args);   

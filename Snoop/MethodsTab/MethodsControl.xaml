@@ -241,7 +241,7 @@ All other rights reserved.
             </Button>-->
 
             <Button Name="_buttonNavigateILSpy" Width="135" Height="25"  Margin="15,0,0,0">
-                <TextBlock Style="{x:Null}" FontSize="10" Text="Open Method Class in ILSpy" />
+                <TextBlock Style="{x:Null}"  Text="Open Method in ILSpy" />
                 <!--<TextBox Background="Transparent" BorderThickness="0" Width="74" AcceptsReturn="True" TextWrapping="WrapWithOverflow" Text="ILSpy Method" FontSize="10" Height="18" />-->
             </Button>
 
