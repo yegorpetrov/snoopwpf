@@ -12,35 +12,139 @@ using System.Runtime.ConstrainedExecution;
 using System.Windows;
 using System.IO;
 
+using System.Reflection;
+using System.Text;
+
 namespace Snoop
 {
+    public class ILSpyIntegration
+    {
+        private MethodInfo decompileMethodInfo;
+        private string directory;
+
+        public ILSpyIntegration(string ilSpyDiretory)
+        {
+            this.directory = ilSpyDiretory;
+        }
+
+        public string DecompileMethodByLoadingAssembly(MethodInfo methodToDecompile)
+        {
+            if (decompileMethodInfo == null)
+            {
+                var location = typeof(Snoop.SnoopUI).Assembly.Location;
+                var directory = Path.GetDirectoryName(location);
+                directory = Path.Combine(directory, "ILSpy");
+
+                var assembly = Assembly.LoadFrom(Path.Combine(directory, "ConsoleApplicationDecompile.exe"));
+                var type = assembly.GetType("ConsoleApplicationDecompile.Program");
+                decompileMethodInfo = type.GetMethod("GetSourceOfMethod");
+            }
+
+            try
+            {
+                var result = decompileMethodInfo.Invoke(null, new object[] { methodToDecompile });
+
+                return result.ToString();
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+
+        public string DecompileMethodUsingExternalProcess(MethodInfo methodToDecompile)
+        {
+            var location = typeof(Snoop.SnoopUI).Assembly.Location;
+            var directory = Path.GetDirectoryName(location);
+            directory = Path.Combine(directory, "ILSpy");
+            var decompileProgramName = Path.Combine(directory, "ConsoleApplicationDecompile.exe");
+
+            Process decompileProcess = new Process();
+            decompileProcess.StartInfo.FileName = decompileProgramName;
+            decompileProcess.StartInfo.WorkingDirectory = directory;
+            //// Set UseShellExecute to false for redirection.
+            var parametersStringArray = GetParametersString(methodToDecompile);
+            //decompileProcess.StartInfo.Arguments = "\"" + methodToDecompile.DeclaringType.Assembly.Location + "\"" + " " + methodToDecompile.DeclaringType.Name + " " + methodToDecompile.Name + " " + parametersStringArray;
+            decompileProcess.StartInfo.Arguments = string.Format("\"{0}\" {1} {2} {3}", methodToDecompile.DeclaringType.Assembly.Location,
+                methodToDecompile.DeclaringType.Name,
+                methodToDecompile.Name,
+                parametersStringArray);
+
+
+            decompileProcess.StartInfo.UseShellExecute = false;
+
+            //// Redirect the standard output of the sort command.   
+            decompileProcess.StartInfo.RedirectStandardOutput = true;
+            StringBuilder sourceCode = new StringBuilder();
+            decompileProcess.Start();
+            sourceCode.Append(decompileProcess.StandardOutput.ReadToEnd());
+            decompileProcess.WaitForExit();
+
+            return sourceCode.ToString();
+        }
+
+        private static string GetParametersString(MethodInfo methodInfo)
+        {
+            var parameters = methodInfo.GetParameters();
+
+            if (parameters.Length == 0)
+                return string.Empty;
+
+            string[] parametersStringArray = new string[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+                parametersStringArray[i] = parameters[i].ParameterType.Name;
+
+            var parametersString = string.Join("|", parametersStringArray);
+            return parametersString;
+        }
+    }
+
     /// <summary>
     /// Class for ILSpy messaging. We'll move this after code review.
     /// </summary>
     public static class ILSpyInterop
     {
+        public const string ILSPY_PREFIX = "ILSpy:\r\n";
+        public const string ILSPY_NAVIGATE_TO_TYPE = "/navigateTo:T:";
+        public const string ILSPY_NAVIGATE_TO_METHOD = "/navigateTo:M:";
+        public const string ILSPY_LINE_BREAK = "\r\n";
+        private static readonly string NAVIGATE_TO_TYPE_MESSAGE;//Format of message to be sent to an existing ilspy process via send message.
+        private static readonly string NAVIGATE_TO_METHOD_MESSAGE;//Format of message to be sent to an existing ilspy process via send message.
+        private static readonly string NAVIGATE_TO_TYPE_ARGUMENT;//Format of command line argument to be sent when starting ILSpy
+        private static readonly string NAVIGATE_TO_METHOD_ARGUMENT;//Format of command line argument to be sent when starting ILSpy
+
+        static ILSpyInterop()
+        {
+            NAVIGATE_TO_TYPE_MESSAGE = ILSPY_PREFIX + ILSPY_LINE_BREAK + "{0}" + ILSPY_LINE_BREAK + ILSPY_NAVIGATE_TO_TYPE + "{1}";
+            NAVIGATE_TO_METHOD_MESSAGE = ILSPY_PREFIX + ILSPY_LINE_BREAK + "{0}" + ILSPY_LINE_BREAK + ILSPY_NAVIGATE_TO_METHOD + "{1}";
+            //"\"{0}\" /navigateTo:T:{1}"
+            NAVIGATE_TO_TYPE_ARGUMENT = "\"{0}\" " + ILSPY_NAVIGATE_TO_TYPE + "{1}";
+            NAVIGATE_TO_METHOD_ARGUMENT = "\"{0}\" " + ILSPY_NAVIGATE_TO_METHOD + "{1}";
+        }
+
         public static void OpenTypeInILSpy(string fullAssemblyPath, string fullTypeName, Process ilSpyProcess)
         {
-            IntPtr windowHandle = ilSpyProcess.MainWindowHandle;
-            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
-            string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            IntPtr windowHandle = ilSpyProcess.MainWindowHandle;            
+            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            string args = string.Format(NAVIGATE_TO_TYPE_MESSAGE, fullAssemblyPath, fullTypeName);
             NativeMethods.Send(windowHandle, args);
             NativeMethods.SetForegroundWindow(ilSpyProcess.MainWindowHandle);
         }
 
         public static void OpenTypeInILSpy(string fullAssemblyPath, string fullTypeName, IntPtr windowHandle)
         {
-            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
-            string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            string args = string.Format(NAVIGATE_TO_TYPE_MESSAGE, fullAssemblyPath, fullTypeName);
             NativeMethods.Send(windowHandle, args);
             NativeMethods.SetForegroundWindow(windowHandle);
         }
 
         public static void OpenMethodInILSpy(string fullAssemblyPath, string fullTypeName, string methodName, IntPtr windowHandle)
         {
-            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", selectedItem.DeclaringType.Assembly.Location, selectedItem.DeclaringType.FullName);
             fullTypeName = fullTypeName.Replace('+', '.');
-            string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            string args = string.Format(NAVIGATE_TO_METHOD_MESSAGE, fullAssemblyPath, fullTypeName + "." + methodName);
             NativeMethods.Send(windowHandle, args);
             NativeMethods.SetForegroundWindow(windowHandle);
         }
@@ -48,17 +152,21 @@ namespace Snoop
         public static Process GetOrCreateILSpyProcess(string fullAssemblyPath, string fullTypeName)
         {
             fullTypeName = fullTypeName.Replace('+', '.');
-            string arguments = string.Format("\"{0}\" /navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
-            string sendToProcessArgs = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            //string arguments = string.Format("\"{0}\" /navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            //string sendToProcessArgs = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
+            string arguments = string.Format(NAVIGATE_TO_TYPE_ARGUMENT, fullAssemblyPath, fullTypeName);
+            string sendToProcessArgs = string.Format(NAVIGATE_TO_TYPE_MESSAGE, fullAssemblyPath, fullTypeName);
             return CreateILSpyProcessWithArguments(fullAssemblyPath, fullTypeName, arguments, sendToProcessArgs);
         }
 
         public static Process GetOrCreateILSpyProcess(string fullAssemblyPath, string fullTypeName, string methodName)
         {
             fullTypeName = fullTypeName.Replace('+', '.');
-            //string arguments = string.Format("\"{0}\" /navigateTo:M:{1}", fullAssemblyPath, fullTypeName + methodName);
-            string arguments = string.Format("\"{0}\" /navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
-            string sendToProcessArgs = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            //string arguments = string.Format("\"{0}\" /navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            //string sendToProcessArgs = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
+            string arguments = string.Format(NAVIGATE_TO_METHOD_ARGUMENT, fullAssemblyPath, fullTypeName + "." + methodName);
+            string sendToProcessArgs = string.Format(NAVIGATE_TO_METHOD_MESSAGE, fullAssemblyPath, fullTypeName + "." + methodName);
+
             return CreateILSpyProcessWithArguments(fullAssemblyPath, fullTypeName, arguments, sendToProcessArgs);
         }
 
@@ -74,15 +182,13 @@ namespace Snoop
             if (processes.Length > 0)
             {
                 ilSpyProcess = processes[0];
-                //ilSpyProcess.EnableRaisingEvents = true;
-                //OpenTypeInILSpy(fullAssemblyPath, fullTypeName, ilSpyProcess);
                 NativeMethods.Send(ilSpyProcess.MainWindowHandle, sendToProcessArgs);
                 NativeMethods.SetForegroundWindow(ilSpyProcess.MainWindowHandle);
                 return ilSpyProcess;
             }
 
             ilSpyProcess = new Process();
-            ilSpyProcess.StartInfo.FileName = ilSpyProgram; // "ConsoleApplicationDecompile.exe";//decompileProgramName;
+            ilSpyProcess.StartInfo.FileName = ilSpyProgram; 
             ilSpyProcess.StartInfo.WorkingDirectory = directory;
             ilSpyProcess.StartInfo.Arguments = arguments;
             //ilSpyProcess.EnableRaisingEvents = true;

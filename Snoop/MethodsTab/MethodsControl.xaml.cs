@@ -38,17 +38,36 @@ namespace Snoop.MethodsTab
             DependencyPropertyDescriptor.FromProperty(MethodsControl.IsSelectedProperty, typeof(MethodsControl)).AddValueChanged(this, IsSelectedChanged);
 
             this._checkBoxUseDataContext.Checked += _checkBoxUseDataContext_Checked;
-            this._checkBoxUseDataContext.Unchecked += new RoutedEventHandler(_checkBoxUseDataContext_Unchecked);
+            this._checkBoxUseDataContext.Unchecked += _checkBoxUseDataContext_Unchecked;
 
-            this._checkBoxShowPrivateMethods.Checked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Checked);
-            this._checkBoxShowPrivateMethods.Unchecked += new RoutedEventHandler(_checkBoxShowPrivateMethods_Unchecked);
+            this._checkBoxShowPrivateMethods.Checked += _checkBoxShowPrivateMethods_Checked;
+            this._checkBoxShowPrivateMethods.Unchecked += _checkBoxShowPrivateMethods_Unchecked;
 
             this._buttonDecompile.Click += DecompileMethodClick;
             //this._buttonOpenFolder.Click += OpenFolderClick;
             this._buttonNavigateILSpy.Click += NavigateILSpyClick;
             this._buttonObjectNavigateILSpy.Click += buttonObjectNavigateILSpy_Click;
             this._buttonInvoke.Click += InvokeMethodClick;
+
+            InitializeILSpyIntegration();
         }
+
+        private void InitializeILSpyIntegration()
+        {
+            var location = typeof(Snoop.SnoopUI).Assembly.Location;
+            var directory = Path.GetDirectoryName(location);
+            directory = Path.Combine(directory, "ILSpy");
+            ilSpyIntegration = new ILSpyIntegration(directory);
+        }
+
+        #region Private fields
+
+        private Process ilSpyProcess;
+        private ILSpyIntegration ilSpyIntegration;
+
+        #endregion
+
+
 
         void _checkBoxShowPrivateMethods_Unchecked(object sender, RoutedEventArgs e)
         {
@@ -118,8 +137,6 @@ namespace Snoop.MethodsTab
             }
         }
 
-
-
         public bool IsSelected
         {
             get { return (bool)GetValue(IsSelectedProperty); }
@@ -129,7 +146,6 @@ namespace Snoop.MethodsTab
         // Using a DependencyProperty as the backing store for IsSelected.  This enables animation, styling, binding, etc...
         public static readonly DependencyProperty IsSelectedProperty =
             DependencyProperty.Register("IsSelected", typeof(bool), typeof(MethodsControl), new UIPropertyMetadata(false));
-
 
 
         private static void TargetChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
@@ -248,7 +264,7 @@ namespace Snoop.MethodsTab
             this.textBlockSourceCode.Visibility = System.Windows.Visibility.Collapsed;
         }
 
-        private Process ilSpyProcess;
+
 
         private void buttonObjectNavigateILSpy_Click(object sender, RoutedEventArgs e)
         {
@@ -355,93 +371,21 @@ namespace Snoop.MethodsTab
             this.textBlockSourceCode.Text = source;
         }
 
-        public static string DecompileMethod(MethodInfo methodToDecompile)
+        public string DecompileMethod(MethodInfo methodToDecompile)
         {
             if (Environment.Version.Major < 4)
             {
-                var sourceCode = DecompileMethodUsingExternalProcess(methodToDecompile);
+                var sourceCode = this.ilSpyIntegration.DecompileMethodUsingExternalProcess(methodToDecompile);
                 return sourceCode;
             }
             else
             {
-                var sourceCode = DecompileMethodByLoadingAssembly(methodToDecompile);
+                var sourceCode = this.ilSpyIntegration.DecompileMethodByLoadingAssembly(methodToDecompile);
                 return sourceCode;
             }
 
         }
-
-        private static MethodInfo _decompileMethodInfo = null;
-        private static string DecompileMethodByLoadingAssembly(MethodInfo methodToDecompile)
-        {
-            if (_decompileMethodInfo == null)
-            {
-                var location = typeof(Snoop.SnoopUI).Assembly.Location;
-                var directory = Path.GetDirectoryName(location);
-                directory = Path.Combine(directory, "ILSpy");
-
-                var assembly = Assembly.LoadFrom(Path.Combine(directory, "ConsoleApplicationDecompile.exe"));
-                var type = assembly.GetType("ConsoleApplicationDecompile.Program");
-                _decompileMethodInfo = type.GetMethod("GetSourceOfMethod");
-            }
-
-            try
-            {
-                var result = _decompileMethodInfo.Invoke(null, new object[] { methodToDecompile });
-
-                return result.ToString();
-            }
-            catch (Exception ex)
-            {
-                return ex.Message;
-            }
-        }
-
-        private static string GetParametersString(MethodInfo methodInfo)
-        {
-            var parameters = methodInfo.GetParameters();
-
-            if (parameters.Length == 0)
-                return string.Empty;
-
-            string[] parametersStringArray = new string[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-                parametersStringArray[i] = parameters[i].ParameterType.Name;
-
-            var parametersString = string.Join("|", parametersStringArray);
-            return parametersString;
-        }
-
-        private static string DecompileMethodUsingExternalProcess(MethodInfo methodToDecompile)
-        {
-            var location = typeof(Snoop.SnoopUI).Assembly.Location;
-            var directory = Path.GetDirectoryName(location);
-            directory = Path.Combine(directory, "ILSpy");
-            var decompileProgramName = Path.Combine(directory, "ConsoleApplicationDecompile.exe");
-
-            Process decompileProcess;
-            decompileProcess = new Process();
-            decompileProcess.StartInfo.FileName = decompileProgramName;// "ConsoleApplicationDecompile.exe";//decompileProgramName;
-            decompileProcess.StartInfo.WorkingDirectory = directory;
-            //// Set UseShellExecute to false for redirection.
-            var parametersStringArray = GetParametersString(methodToDecompile);
-            //decompileProcess.StartInfo.Arguments = "\"" + methodToDecompile.DeclaringType.Assembly.Location + "\"" + " " + methodToDecompile.DeclaringType.Name + " " + methodToDecompile.Name + " " + parametersStringArray;
-            decompileProcess.StartInfo.Arguments = string.Format("\"{0}\" {1} {2} {3}", methodToDecompile.DeclaringType.Assembly.Location,
-                methodToDecompile.DeclaringType.Name,
-                methodToDecompile.Name,
-                parametersStringArray);
-
-
-            decompileProcess.StartInfo.UseShellExecute = false;
-
-            //// Redirect the standard output of the sort command.   
-            decompileProcess.StartInfo.RedirectStandardOutput = true;
-            StringBuilder sourceCode = new StringBuilder();
-            decompileProcess.Start();
-            sourceCode.Append(decompileProcess.StandardOutput.ReadToEnd());
-            decompileProcess.WaitForExit();
-
-            return sourceCode.ToString();
-        }
+      
 
         private bool TryToCreateParameters(object[] parameters)
         {
