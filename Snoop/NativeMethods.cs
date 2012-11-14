@@ -105,7 +105,7 @@ namespace Snoop
     /// </summary>
     public static class ILSpyInterop
     {
-        public const string ILSPY_PREFIX = "ILSpy:\r\n";
+        public const string ILSPY_PREFIX = "ILSpy:";
         public const string ILSPY_NAVIGATE_TO_TYPE = "/navigateTo:T:";
         public const string ILSPY_NAVIGATE_TO_METHOD = "/navigateTo:M:";
         public const string ILSPY_LINE_BREAK = "\r\n";
