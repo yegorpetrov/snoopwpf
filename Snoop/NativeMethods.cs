@@ -126,27 +126,27 @@ namespace Snoop
         public static void OpenTypeInILSpy(string fullAssemblyPath, string fullTypeName, Process ilSpyProcess)
         {
             IntPtr windowHandle = ilSpyProcess.MainWindowHandle;            
-            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
             string args = string.Format(NAVIGATE_TO_TYPE_MESSAGE, fullAssemblyPath, fullTypeName);
-            NativeMethods.Send(windowHandle, args);
             NativeMethods.SetForegroundWindow(ilSpyProcess.MainWindowHandle);
+            NativeMethods.Send(windowHandle, args);
+            
         }
 
         public static void OpenTypeInILSpy(string fullAssemblyPath, string fullTypeName, IntPtr windowHandle)
         {
-            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:T:{1}", fullAssemblyPath, fullTypeName);
             string args = string.Format(NAVIGATE_TO_TYPE_MESSAGE, fullAssemblyPath, fullTypeName);
-            NativeMethods.Send(windowHandle, args);
             NativeMethods.SetForegroundWindow(windowHandle);
+            NativeMethods.Send(windowHandle, args);
+            
         }
 
         public static void OpenMethodInILSpy(string fullAssemblyPath, string fullTypeName, string methodName, IntPtr windowHandle)
         {
             fullTypeName = fullTypeName.Replace('+', '.');
-            //string args = string.Format("ILSpy:\r\n{0}\r\n/navigateTo:M:{1}", fullAssemblyPath, fullTypeName + "." + methodName);
             string args = string.Format(NAVIGATE_TO_METHOD_MESSAGE, fullAssemblyPath, fullTypeName + "." + methodName);
-            NativeMethods.Send(windowHandle, args);
             NativeMethods.SetForegroundWindow(windowHandle);
+            NativeMethods.Send(windowHandle, args);
+            
         }
 
         public static Process GetOrCreateILSpyProcess(string fullAssemblyPath, string fullTypeName)
@@ -182,8 +182,9 @@ namespace Snoop
             if (processes.Length > 0)
             {
                 ilSpyProcess = processes[0];
-                NativeMethods.Send(ilSpyProcess.MainWindowHandle, sendToProcessArgs);
                 NativeMethods.SetForegroundWindow(ilSpyProcess.MainWindowHandle);
+                NativeMethods.Send(ilSpyProcess.MainWindowHandle, sendToProcessArgs);
+                
                 return ilSpyProcess;
             }
 
