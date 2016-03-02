@@ -20,6 +20,7 @@ using Snoop.Infrastructure;
 using System.Text;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.IO;
 
 namespace Snoop
 {
@@ -30,6 +31,7 @@ namespace Snoop
 		public static readonly RoutedCommand DelveCommand = new RoutedCommand();
 		public static readonly RoutedCommand DelveBindingCommand = new RoutedCommand();
 		public static readonly RoutedCommand DelveBindingExpressionCommand = new RoutedCommand();
+		public static readonly RoutedCommand ExportPropertiesCommand = new RoutedCommand();
 
 		public PropertyInspector()
 		{
@@ -45,6 +47,7 @@ namespace Snoop
 			this.CommandBindings.Add(new CommandBinding(PropertyInspector.DelveCommand, this.HandleDelve, this.CanDelve));
 			this.CommandBindings.Add(new CommandBinding(PropertyInspector.DelveBindingCommand, this.HandleDelveBinding, this.CanDelveBinding));
 			this.CommandBindings.Add(new CommandBinding(PropertyInspector.DelveBindingExpressionCommand, this.HandleDelveBindingExpression, this.CanDelveBindingExpression));
+			this.CommandBindings.Add(new CommandBinding(PropertyInspector.ExportPropertiesCommand, this.HandleExportProperties));
 
 			// watch for mouse "back" button
 			this.MouseDown += new MouseButtonEventHandler(MouseDownHandler);
@@ -302,6 +305,20 @@ namespace Snoop
 			if (e.Parameter != null && ((PropertyInformation)e.Parameter).BindingExpression != null)
 				e.CanExecute = true;
 			e.Handled = true;
+		}
+
+		private void HandleExportProperties(object sender, ExecutedRoutedEventArgs e)
+		{
+			using (StreamWriter csv = File.CreateText(System.IO.Path.Combine(System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "SnoopProperties.txt")))
+			{
+				foreach (PropertyInformation propertyInformation in PropertyGrid.Properties)
+				{
+					csv.WriteLine(string.Format("{0},{1}", propertyInformation.DisplayName, propertyInformation.StringValue));
+				}
+
+				csv.Flush();
+				csv.Close();
+			}
 		}
 
 		public PropertyFilter PropertyFilter
