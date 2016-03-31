@@ -110,7 +110,10 @@ All other rights reserved.
 					<ComboBoxItem>
 						<TextBlock Style="{x:Null}" Text="600"/>
 					</ComboBoxItem>
-				</ComboBox>
+                    <ComboBoxItem>
+                        <TextBlock Style="{x:Null}" Text="XPS"/>
+                    </ComboBoxItem>
+                </ComboBox>
 				<TextBlock Style="{x:Null}" VerticalAlignment="Center" Text="DPI"/>
 			</StackPanel>
 

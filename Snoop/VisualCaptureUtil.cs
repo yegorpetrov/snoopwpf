@@ -7,6 +7,9 @@ using System;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows;
+using System.IO.Packaging;
+using System.IO;
+using System.Windows.Xps.Packaging;
 
 namespace Snoop
 {
@@ -57,13 +60,22 @@ namespace Snoop
 
 		private static void SaveRTBAsPNG(RenderTargetBitmap bitmap, string filename)
 		{
-			var pngBitmapEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-			pngBitmapEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+			var pngBitmapEncoder = new PngBitmapEncoder();
+			pngBitmapEncoder.Frames.Add(BitmapFrame.Create(bitmap));
 
-			using (var fileStream = System.IO.File.Create(filename))
+			using (var fileStream = File.Create(filename))
 				pngBitmapEncoder.Save(fileStream);
 		}
 
 		private const double BaseDpi = 96;
-	}
+
+        public static void SaveVisualAsXPS(Visual source, Size bounds, string filename)
+        {
+            using (var container = Package.Open(filename, FileMode.Create))
+            using (var doc = new XpsDocument(container, CompressionOption.Maximum))
+            {
+                XpsDocument.CreateXpsDocumentWriter(doc).Write(source);
+            }
+        }
+    }
 }

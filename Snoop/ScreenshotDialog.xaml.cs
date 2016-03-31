@@ -48,7 +48,7 @@ namespace Snoop
 				"FilePath",
 				typeof(string),
 				typeof(ScreenshotDialog),
-				new UIPropertyMetadata(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\SnoopScreenshot.png")
+				new UIPropertyMetadata(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\SnoopScreenshot")
 			);
 
 		#endregion
@@ -65,26 +65,38 @@ namespace Snoop
 		}
 		private void HandleSave(object sender, ExecutedRoutedEventArgs e)
 		{
-			SaveFileDialog fileDialog = new SaveFileDialog();
+            var comboText = ((TextBlock)((ComboBoxItem)dpiBox.SelectedItem).Content).Text;
+            var xps = comboText == "XPS";
+
+            SaveFileDialog fileDialog = new SaveFileDialog();
 			fileDialog.AddExtension = true;
 			fileDialog.CheckPathExists = true;
-			fileDialog.DefaultExt = "png";
-			fileDialog.FileName = FilePath;
+            fileDialog.Filter = xps ? "XPS files (*.xps)|*.xps" : "PNG files (*.png)|*.png";
+            fileDialog.DefaultExt = xps ? "xps" : "png";
+			fileDialog.FileName = FilePath + "." + fileDialog.DefaultExt;
 
 			if (fileDialog.ShowDialog(this).Value)
 			{
 				FilePath = fileDialog.FileName;
-				VisualCaptureUtil.SaveVisual
-				(
-					DataContext as Visual,
-					int.Parse
-					(
-						((TextBlock)((ComboBoxItem)dpiBox.SelectedItem).Content).Text
-					),
-					FilePath
-				);
 
-				Close();
+                if (!xps)
+                {
+                    VisualCaptureUtil.SaveVisual
+                    (
+                        DataContext as Visual,
+                        int.Parse(comboText),
+                        FilePath
+                    );
+                }
+                else
+                {
+                    var visual = DataContext as Visual;
+                    var ui = visual as UIElement;
+                    VisualCaptureUtil.SaveVisualAsXPS(visual,
+                        ui?.RenderSize ?? new Size(800, 600), FilePath);
+                }
+
+                Close();
 			}
 		}
 
